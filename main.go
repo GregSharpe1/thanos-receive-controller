@@ -730,11 +730,14 @@ func (c *controller) saveHashring(ctx context.Context, hashring []receive.Hashri
 		return err
 	}
 
+	orgLabels := orgCM.GetLabels()
+	orgLabels["controller.receive.thanos.io/generated"] = "true"
+
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.options.configMapGeneratedName,
 			Namespace: c.options.namespace,
-			Labels:    orgCM.GetLabels(),
+			Labels:    orgLabels,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",
