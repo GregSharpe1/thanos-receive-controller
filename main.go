@@ -734,6 +734,7 @@ func (c *controller) saveHashring(ctx context.Context, hashring []receive.Hashri
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.options.configMapGeneratedName,
 			Namespace: c.options.namespace,
+			Labels:    orgCM.GetLabels(),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",
