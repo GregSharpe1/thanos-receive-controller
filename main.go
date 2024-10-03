@@ -130,7 +130,7 @@ func main() {
 		tmpConfigMapGeneratedCustomLabel = "controller.receive.thanos.io/generated=true"
 	}
 
-	configMapGeneratedCustomLabelLabel, configMapGeneratedCustomLabelKey := splitLabel(tmpConfigMapGeneratedCustomLabel)
+	configMapGeneratedCustomLabelKey, configMapGeneratedCustomLabelLabel := splitLabel(tmpConfigMapGeneratedCustomLabel)
 
 	konfig, err := clientcmd.BuildConfigFromFlags("", config.KubeConfig)
 	if err != nil {

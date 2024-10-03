@@ -96,7 +96,7 @@ clean:
 container-build:
 	git update-index --refresh
 	docker buildx build \
-		--platform linux/amd64,linux/arm64 \
+		--platform linux/amd64 \
 		--cache-to type=local,dest=./.buildxcache/ \
 	    --build-arg BUILD_DATE="$(BUILD_TIMESTAMP)" \
 		--build-arg VERSION="$(VERSION)" \
