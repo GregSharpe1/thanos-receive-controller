@@ -59,23 +59,24 @@ const (
 )
 
 type CmdConfig struct {
-	KubeConfig             string
-	Namespace              string
-	StatefulSetLabel       string
-	Label                  string
-	ClusterDomain          string
-	ConfigMapName          string
-	ConfigMapGeneratedName string
-	FileName               string
-	Port                   int
-	Scheme                 string
-	InternalAddr           string
-	AllowOnlyReadyReplicas bool
-	AllowDynamicScaling    bool
-	AnnotatePodsOnChange   bool
-	ScaleTimeout           time.Duration
-	useAzAwareHashRing     bool
-	podAzAnnotationKey     string
+	KubeConfig                    string
+	Namespace                     string
+	StatefulSetLabel              string
+	Label                         string
+	ClusterDomain                 string
+	ConfigMapName                 string
+	ConfigMapGeneratedName        string
+	ConfigMapGeneratedCustomLabel string
+	FileName                      string
+	Port                          int
+	Scheme                        string
+	InternalAddr                  string
+	AllowOnlyReadyReplicas        bool
+	AllowDynamicScaling           bool
+	AnnotatePodsOnChange          bool
+	ScaleTimeout                  time.Duration
+	useAzAwareHashRing            bool
+	podAzAnnotationKey            string
 }
 
 func parseFlags() CmdConfig {
@@ -88,6 +89,7 @@ func parseFlags() CmdConfig {
 	flag.StringVar(&config.ClusterDomain, "cluster-domain", "cluster.local", "The DNS domain of the cluster")
 	flag.StringVar(&config.ConfigMapName, "configmap-name", "", "The name of the original ConfigMap containing the hashring tenant configuration")
 	flag.StringVar(&config.ConfigMapGeneratedName, "configmap-generated-name", "", "The name of the generated and populated ConfigMap")
+	flag.StringVar(&config.ConfigMapGeneratedCustomLabel, "configmap-generated-custom-label", "controller.receive.thanos.io/generated=true", "The additional label to add to the generated configmap.")
 	flag.StringVar(&config.FileName, "file-name", "", "The name of the configuration file in the ConfigMap")
 	flag.IntVar(&config.Port, "port", defaultPort, "The port on which receive components are listening for write requests")
 	flag.StringVar(&config.Scheme, "scheme", "http", "The URL scheme on which receive components accept write requests")
@@ -121,6 +123,15 @@ func main() {
 
 	labelKey, labelValue := splitLabel(tmpControllerLabel)
 
+	var tmpConfigMapGeneratedCustomLabel string
+	if len(config.ConfigMapGeneratedCustomLabel) > 0 {
+		tmpConfigMapGeneratedCustomLabel = config.ConfigMapGeneratedCustomLabel
+	} else {
+		tmpConfigMapGeneratedCustomLabel = "controller.receive.thanos.io/generated=true"
+	}
+
+	configMapGeneratedCustomLabelLabel, configMapGeneratedCustomLabelKey := splitLabel(tmpConfigMapGeneratedCustomLabel)
+
 	konfig, err := clientcmd.BuildConfigFromFlags("", config.KubeConfig)
 	if err != nil {
 		stdlog.Fatal(err)
@@ -148,18 +159,21 @@ func main() {
 			clusterDomain:          config.ClusterDomain,
 			configMapName:          config.ConfigMapName,
 			configMapGeneratedName: config.ConfigMapGeneratedName,
-			fileName:               config.FileName,
-			namespace:              config.Namespace,
-			port:                   config.Port,
-			scheme:                 config.Scheme,
-			labelKey:               labelKey,
-			labelValue:             labelValue,
-			allowOnlyReadyReplicas: config.AllowOnlyReadyReplicas,
-			annotatePodsOnChange:   config.AnnotatePodsOnChange,
-			allowDynamicScaling:    config.AllowDynamicScaling,
-			scaleTimeout:           config.ScaleTimeout,
-			useAzAwareHashRing:     config.useAzAwareHashRing,
-			podAzAnnotationKey:     config.podAzAnnotationKey,
+			// TODO(gsharpe): Sort out the naming here!
+			configMapGeneratedCustomLabelLabel: configMapGeneratedCustomLabelLabel,
+			configMapGeneratedCustomLabelKey:   configMapGeneratedCustomLabelKey,
+			fileName:                           config.FileName,
+			namespace:                          config.Namespace,
+			port:                               config.Port,
+			scheme:                             config.Scheme,
+			labelKey:                           labelKey,
+			labelValue:                         labelValue,
+			allowOnlyReadyReplicas:             config.AllowOnlyReadyReplicas,
+			annotatePodsOnChange:               config.AnnotatePodsOnChange,
+			allowDynamicScaling:                config.AllowDynamicScaling,
+			scaleTimeout:                       config.ScaleTimeout,
+			useAzAwareHashRing:                 config.useAzAwareHashRing,
+			podAzAnnotationKey:                 config.podAzAnnotationKey,
 		}
 		c := newController(klient, logger, opt)
 		c.registerMetrics(reg)
@@ -331,21 +345,23 @@ func (p prometheusReflectorMetrics) NewLastResourceVersionMetric(_ string) cache
 }
 
 type options struct {
-	clusterDomain          string
-	configMapName          string
-	configMapGeneratedName string
-	fileName               string
-	namespace              string
-	port                   int
-	scheme                 string
-	labelKey               string
-	labelValue             string
-	allowOnlyReadyReplicas bool
-	allowDynamicScaling    bool
-	annotatePodsOnChange   bool
-	scaleTimeout           time.Duration
-	useAzAwareHashRing     bool
-	podAzAnnotationKey     string
+	clusterDomain                      string
+	configMapName                      string
+	configMapGeneratedName             string
+	configMapGeneratedCustomLabelLabel string
+	configMapGeneratedCustomLabelKey   string
+	fileName                           string
+	namespace                          string
+	port                               int
+	scheme                             string
+	labelKey                           string
+	labelValue                         string
+	allowOnlyReadyReplicas             bool
+	allowDynamicScaling                bool
+	annotatePodsOnChange               bool
+	scaleTimeout                       time.Duration
+	useAzAwareHashRing                 bool
+	podAzAnnotationKey                 string
 }
 
 type controller struct {
@@ -730,8 +746,9 @@ func (c *controller) saveHashring(ctx context.Context, hashring []receive.Hashri
 		return err
 	}
 
+	// Fetch the existing labels on the "template" ConfigMap and add the custom label.
 	orgLabels := orgCM.GetLabels()
-	orgLabels["controller.receive.thanos.io/generated"] = "true"
+	orgLabels[c.options.configMapGeneratedCustomLabelKey] = c.options.configMapGeneratedCustomLabelLabel
 
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
