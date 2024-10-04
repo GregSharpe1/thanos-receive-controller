@@ -130,7 +130,7 @@ func main() {
 		tmpConfigMapGeneratedCustomLabel = "controller.receive.thanos.io/generated=true"
 	}
 
-	configMapGeneratedCustomLabelKey, configMapGeneratedCustomLabelLabel := splitLabel(tmpConfigMapGeneratedCustomLabel)
+	configMapGeneratedCustomLabelKey, configMapGeneratedCustomLabelValue := splitLabel(tmpConfigMapGeneratedCustomLabel)
 
 	konfig, err := clientcmd.BuildConfigFromFlags("", config.KubeConfig)
 	if err != nil {
@@ -156,11 +156,10 @@ func main() {
 	}
 	{
 		opt := &options{
-			clusterDomain:          config.ClusterDomain,
-			configMapName:          config.ConfigMapName,
-			configMapGeneratedName: config.ConfigMapGeneratedName,
-			// TODO(gsharpe): Sort out the naming here!
-			configMapGeneratedCustomLabelLabel: configMapGeneratedCustomLabelLabel,
+			clusterDomain:                      config.ClusterDomain,
+			configMapName:                      config.ConfigMapName,
+			configMapGeneratedName:             config.ConfigMapGeneratedName,
+			configMapGeneratedCustomLabelValue: configMapGeneratedCustomLabelValue,
 			configMapGeneratedCustomLabelKey:   configMapGeneratedCustomLabelKey,
 			fileName:                           config.FileName,
 			namespace:                          config.Namespace,
@@ -348,7 +347,7 @@ type options struct {
 	clusterDomain                      string
 	configMapName                      string
 	configMapGeneratedName             string
-	configMapGeneratedCustomLabelLabel string
+	configMapGeneratedCustomLabelValue string
 	configMapGeneratedCustomLabelKey   string
 	fileName                           string
 	namespace                          string
@@ -748,7 +747,7 @@ func (c *controller) saveHashring(ctx context.Context, hashring []receive.Hashri
 
 	// Fetch the existing labels on the "template" ConfigMap and add the custom label.
 	orgLabels := orgCM.GetLabels()
-	orgLabels[c.options.configMapGeneratedCustomLabelKey] = c.options.configMapGeneratedCustomLabelLabel
+	orgLabels[c.options.configMapGeneratedCustomLabelKey] = c.options.configMapGeneratedCustomLabelValue
 
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
